@@ -1,0 +1,31 @@
+<?php
+/**
+ * Wzorzec pliku z nadpisaniami lokalnymi.
+ *
+ *  Skopiuj ten plik jako config/config.local.php, aby nadpisać ustawienia
+ *  z config/config.php - np. na maszynie testowej, gdzie baza ma inną nazwę
+ *  albo inne dane dostępowe. Plik config.local.php ma pierwszeństwo.
+ *
+ *  UWAGA: plik config.local.php jest opcjonalny. Nie musisz go tworzyć.
+ */
+
+return [
+    'db' => [
+        'name'        => 'magazyn_test',
+        'host'        => 'localhost',
+        'port'        => 3306,
+        'user'        => 'magazyn_app',
+        'pass'        => 'haslo',
+        'charset'     => 'utf8mb4',
+        'socket'      => '',
+        'show_errors' => true,
+    ],
+
+    'app' => [
+        'base_path' => '',
+    ],
+
+    'auth' => [
+        'enabled' => true,
+    ],
+];

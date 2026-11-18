@@ -1,0 +1,390 @@
+================================================================================
+  PANEL MAGAZYNU - INSTALACJA NA SERWERZE DEBIAN / UBUNTU
+================================================================================
+
+  Wersja panelu : 1.3.1
+  Dokument      : README.md (w tej samej paczce)
+  Instrukcja dla użytkownika: docs/instrukcja-uzytkownika.md
+
+  W tym pliku są komendy do wklejania w terminal. Linie zaczynające się od
+  "#" to komentarze - nie trzeba ich wykonywać. Miejsca do podmiany
+  oznaczone są jako  <...>.
+
+
+--------------------------------------------------------------------------------
+  0. CO SERWER MUSI MIEĆ
+--------------------------------------------------------------------------------
+
+  PHP          8.0 lub nowszy
+  Rozszerzenia pdo_mysql, mbstring, iconv
+  Baza         MariaDB 10.x albo MySQL 5.7+
+  Serwer WWW   Apache (mod_php lub PHP-FPM) albo Nginx + PHP-FPM
+
+  Panel NIE wymaga: Composera, npm, internetu, CDN-a, mod_rewrite,
+  dostępu do panelu hostingu. Wszystkie zależności są w paczce.
+
+  Panel NIE zmienia struktury bazy - użytkownik bazy potrzebuje wyłącznie
+  praw SELECT, INSERT, UPDATE, DELETE.
+
+
+--------------------------------------------------------------------------------
+  1. INSTALACJA PAKIETÓW
+--------------------------------------------------------------------------------
+
+  Wariant A - Apache (najprostszy):
+
+      sudo apt update
+      sudo apt install -y apache2 mariadb-server \
+          libapache2-mod-php php-mysql php-mbstring php-curl php-xml unzip
+
+  Wariant B - Nginx + PHP-FPM:
+
+      sudo apt update
+      sudo apt install -y nginx mariadb-server \
+          php-fpm php-mysql php-mbstring php-curl php-xml unzip
+
+  Na starszych Debianach pakiet PHP nazywa się php7.4-mysql / php7.4-mbstring.
+  Sprawdź wersję komendą z punktu 2.
+
+
+--------------------------------------------------------------------------------
+  2. SPRAWDZENIE PHP
+--------------------------------------------------------------------------------
+
+      php -v
+      php -m | grep -E 'pdo_mysql|mbstring|iconv'
+
+  Oczekiwany wynik - trzy linijki:
+
+      pdo_mysql
+      mbstring
+      iconv
+
+  Jeśli któregoś brakuje:
+
+      sudo apt install -y php-mysql php-mbstring php-iconv
+
+  Sprawdź też, czy katalog sesji PHP istnieje i jest zapisywalny:
+
+      php -r 'echo ini_get("session.save_path"), "\n";'
+      ls -ld /var/lib/php/sessions
+
+
+--------------------------------------------------------------------------------
+  3. BAZA DANYCH I UŻYTKOWNIK
+--------------------------------------------------------------------------------
+
+      sudo mysql
+
+  W konsoli MySQL:
+
+      CREATE DATABASE magazyn CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+      CREATE USER 'magazyn_app'@'localhost' IDENTIFIED BY '<TUTAJ_SILNE_HASLO>';
+      GRANT SELECT, INSERT, UPDATE, DELETE ON magazyn.* TO 'magazyn_app'@'localhost';
+      FLUSH PRIVILEGES;
+
+      exit
+
+  Uwagi:
+  - jeśli baza 'magazyn' już istnieje z danymi, NIE twórz jej drugi raz -
+    wystarczy samo CREATE USER i GRANT;
+  - jeśli panel ma się łączyć z bazą na innym hoście, użyj 'magazyn_app'@'%'
+    i dopisz do GRANT: REQUIRE SSL;
+  - hasło bazy to hasło do tabel, nie do panelu. Hasło do logowania do panelu
+    ustawiasz w kreatorze (punkt 10).
+
+
+--------------------------------------------------------------------------------
+  4. WGRANIE PLIKÓW PANELU
+--------------------------------------------------------------------------------
+
+  Rozpakuj paczkę 'magazyn-panel.zip' - pliki leżą W KATALOGU GŁÓWNYM archiwum
+  (bez dodatkowego folderu w środku), więc:
+
+      sudo mkdir -p /var/www/html/twojapaczka
+      cd /var/www/html/twojapaczka
+      sudo unzip -o /ścieżka/do/magazyn-panel.zip
+
+  Sprawdź, czy index.php jest na swoim miejscu:
+
+      ls -l /var/www/html/twojapaczka/index.php
+
+  Katalog docelowy dla innych hostingów:
+    Debian/Ubuntu + Apache : /var/www/html/twojapaczka/
+    domena w katalogu        : /var/www/domena.pl/twojapaczka/
+    home.pl / FTP            : public_html/twojapaczka/
+    OVH mutualisé            : www/twojapaczka/
+    VPS + Nginx              : /var/www/html/twojapaczka/
+
+
+--------------------------------------------------------------------------------
+  5. UPRAWNIENIA
+--------------------------------------------------------------------------------
+
+      sudo chown -R www-data:www-data /var/www/html/twojapaczka
+      sudo chmod -R 750 /var/www/html/twojapaczka
+      sudo chmod 755 /var/www/html/twojapaczka/config
+
+  Katalog 'config/' musi być zapisywalny dla PHP - tam panel zapisuje dane
+  bazy (config/db.local.php) i konta (config/users.php) z kreatora.
+
+  Na hostingu www, gdzie PHP działa jako Twój użytkownik, wystarczy:
+      chmod 755 config
+
+
+--------------------------------------------------------------------------------
+  6. APACHE - WLASCIWY KONFIG (konieczne!)
+--------------------------------------------------------------------------------
+
+  Pliki .htaccess chroniące katalogi config/, app/, sql/, bin/ i docs/
+  działają TYLKO wtedy, gdy Apache ma włączone AllowOverride.
+  Bez tego panel wystawia te katalogi publicznie!
+
+      sudo a2enmod headers rewrite
+      sudo sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+      sudo systemctl restart apache2
+
+  Sprawdź, czy zmiana się zastosowała:
+
+      grep -n "AllowOverride" /etc/apache2/apache2.conf
+
+  Uwaga: przy 'AllowOverride All' Apache czyta .htaccess przy każdym żądaniu -
+  to minimalny narzut. Jeśli wolisz wydajność, zamiast tego zamknij katalogi
+  w konfiguracji vhosta:
+
+      # w /etc/apache2/sites-available/twojapaczka.conf
+      <Directory /var/www/html/twojapaczka/config>
+          Require all denied
+      </Directory>
+      <Directory /var/www/html/twojapaczka/app>
+          Require all denied
+      </Directory>
+      <Directory /var/www/html/twojapaczka/sql>
+          Require all denied
+      </Directory>
+      <Directory /var/www/html/twojapaczka/bin>
+          Require all denied
+      </Directory>
+      <Directory /var/www/html/twojapaczka/docs>
+          Require all denied
+      </Directory>
+
+      sudo a2ensite twojapaczka && sudo systemctl reload apache2
+
+
+--------------------------------------------------------------------------------
+  7. NGINX - PEŁNY BLOK SERWERA
+--------------------------------------------------------------------------------
+
+  W Nginx pliki .htaccess są IGNOROWANE, więc blokady musisz zrobić w konfiguracji.
+
+  Wykryj gniazdo PHP-FPM (numer wersji zależy od systemu):
+
+      ls /run/php/php*-fpm.sock
+
+  Utwórz plik /etc/nginx/sites-available/magazyn:
+
+      server {
+          listen 80;
+          listen [::]:80;
+          server_name twojadomena.pl;
+
+          root /var/www/html;
+          index index.php;
+
+          # --- blokada katalogów z kodem i konfiguracją -----------------
+          # Reguła działa zarówno dla panelu w katalogu głównym,
+          # jak i w podkatalogu (/twojapaczka/config/ itd.)
+          location ~* ^/(?:[^/]+/)?(?:config|app|sql|bin|docs)/ {
+              deny all;
+          }
+
+          # --- PHP ----------------------------------------------------
+          location ~ \.php$ {
+              include snippets/fastcgi-php.conf;
+              fastcgi_pass unix:/run/php/php8.2-fpm.sock;   # <- wstaw swoje gniazdo
+          }
+
+          # --- panel w podkatalogu -----------------------------------
+          location /twojapaczka/ {
+              try_files $uri $uri/ /twojapaczka/index.php?$query_string;
+          }
+
+          # --- reszta witryny (opcjonalnie) -------------------------
+          location / {
+              try_files $uri $uri/ =404;
+          }
+      }
+
+  Włącz i przeładuj:
+
+      sudo ln -s /etc/nginx/sites-available/magazyn /etc/nginx/sites-enabled/
+      sudo nginx -t
+      sudo systemctl reload nginx
+
+  Gniazdo PHP-FPM bywa też w innym miejscu - sprawdź:
+      systemctl list-units 'php*-fpm.service'
+
+  Jeśli panel ma być w katalogu GŁÓWNYM domeny (bez podkatalogu), zmień
+  'root' na /var/www/html/twojapaczka i usuń blok location /twojapaczka/.
+
+
+--------------------------------------------------------------------------------
+  8. UTWORZENIE BAZY - tylko jeśli baza jest pusta
+--------------------------------------------------------------------------------
+
+      cd /var/www/html/twojapaczka
+      sudo mysql --default-character-set=utf8mb4 magazyn < sql/schema.sql
+
+  Jeśli baza ma już dane - POMIŃ ten krok.
+
+  Repozytorium zawiera TYLKO strukturę - bez żadnych danych. Tabele startują
+  od ID = 1, więc możesz zacząć wypełniać je od zera:
+
+    a) przez panel - menu "Tabele" -> dodawanie rekordów,
+    b) importem własnego dumpa (zawsze z kodowaniem utf8mb4, inaczej polskie
+       znaki się popsują):
+
+         sudo mysql --default-character-set=utf8mb4 magazyn < twoj-dump.sql
+
+
+--------------------------------------------------------------------------------
+  9. NAPRAWA KODOWANIA ZNAKÓW
+--------------------------------------------------------------------------------
+
+  Jeśli wgrywasz WŁASNY dump wykonany z połączenia w kodowaniu latin1, część
+  polskich znaków może być zniekształcona (np. 'trzeba odebraÄ‡' zamiast
+  'trzeba odebrać'). Popraw to jednym poleceniem:
+
+      cd /var/www/html/twojapaczka
+      sudo -u www-data php bin/repair-encoding.php            # najpierw raport
+      sudo -u www-data php bin/repair-encoding.php --write    # dopiero potem zapis
+
+  Narzędzie pokaże listę rekordów do poprawy - sprawdź ją, zanim zapiszesz.
+  Powinno znaleźć dokładnie 1 wiersz.
+
+
+--------------------------------------------------------------------------------
+  10. PIERWSZE URUCHOMIENIE - KREATOR
+--------------------------------------------------------------------------------
+
+  Otwórz w przeglądarce:
+
+      http://twojadomena.pl/twojapaczka/
+
+  Panel sam wykryje brak konfiguracji i otworzy kreator:
+
+  KROK 1 - połączenie z bazą:
+      host          localhost
+      port          3306
+      nazwa bazy    magazyn
+      użytkownik    magazyn_app
+      hasło         hasło z punktu 3
+      socket        (puste, jeśli MariaDB słucha na 3306)
+
+  Panel TESTUJE połączenie i dopiero po udanym teście zapisuje ustawienia
+  w config/db.local.php.
+
+  KROK 2 - konto administratora:
+      login         ADMIN
+      nazwa         Administrator
+      hasło         (własne, min. 8 znaków)
+
+  Po tym możesz się zalogować. Brak domyślnego hasła - panel nie ma żadnego.
+
+
+--------------------------------------------------------------------------------
+  11. HTTPS
+--------------------------------------------------------------------------------
+
+  Panel działa bez HTTPS, ale logowanie przesyła hasło - na produkcji użyj
+  certyfikatu. Najprościej (Let's Encrypt):
+
+      sudo apt install -y certbot python3-certbot-apache
+      sudo certbot --apache -d twojadomena.pl
+
+  Po certyfikacie sprawdź w config/config.php sekcję 'auth' -> 'secure_cookie'
+  i ustaw true, jeśli panel działa już tylko po HTTPS.
+
+
+--------------------------------------------------------------------------------
+  12. SPRAWDZENIE PO INSTALACJI
+--------------------------------------------------------------------------------
+
+  - [ ] panel otwiera się i NIE prosi ponownie o kreator
+  - [ ] logowanie działa, pod loginem widać rolę
+  - [ ] pulpit pokazuje 25 modeli / 67 drukarek / 114 materialow / 644 wymiany
+  - [ ] menu "Struktura bazy" pokazuje 5 tabel
+  - [ ] katalogi config/, app/, sql/ nie otwierają się w przeglądarce
+  - [ ] php -m | grep pdo_mysql dziala
+  - [ ] sudo mysql -u magazyn_app -p -h localhost magazyn  -> polaczenie dziala
+  - [ ] konto z rola "Tylko odczyt" nie ma przyciskow zapisu
+
+
+--------------------------------------------------------------------------------
+  13. AKTUALIZACJA PANELU
+--------------------------------------------------------------------------------
+
+  Paczka NIE zawiera plikow config/db.local.php, config/users.php ani
+  config/panel-data.json, wiec mozesz rozpakowac nowa wersje na wierzch:
+
+      cd /var/www/html/twojapaczka
+      sudo unzip -o /sciezka/do/magazyn-panel.zip
+      sudo chown -R www-data:www-data /var/www/html/twojapaczka
+      sudo chmod 755 /var/www/html/twojapaczka/config
+
+  Konta, dane bazy i lista pomijanych materialow zostana nietkniete.
+  Przed aktualizacja zrob kopie (punkt 14).
+
+
+--------------------------------------------------------------------------------
+  14. KOPIA ZAPASOWA
+--------------------------------------------------------------------------------
+
+      mysqldump -u root -p magazyn > backup-magazyn-$(date +%F).sql
+      sudo tar czf backup-panel-config-$(date +%F).tar.gz /var/www/html/twojapaczka/config
+
+  Kopia katalogu config/ jest wazna, bo trzyma hashe kont i dane do dolaczenia
+  do bazy.
+
+
+--------------------------------------------------------------------------------
+  15. PODGLAD NA WLASNYM KOMPUTERZE (bez serwera)
+--------------------------------------------------------------------------------
+
+  Do szybkiego obejrzenia panelu na swoim komputerze, bez konfigurowania
+  Apache i bazy:
+
+      # 1. sklonuj repozytorium do podkatalogu
+      mkdir -p podglad/twojapaczka
+      git clone https://github.com/stainleSSStar/MAGAZYN-SPL.git podglad/twojapaczka
+
+      # 2. utworz pusta baze testowa ze struktury
+      mysql -e "CREATE DATABASE magazyn_podglad CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+      mysql --default-character-set=utf8mb4 magazyn_podglad < podglad/twojapaczka/sql/schema.sql
+
+      # 3. uruchom wbudowany serwer PHP
+      cd podglad
+      php -S 127.0.0.1:8950
+
+      # 4. otworz w przeglądarce
+      #    http://127.0.0.1:8950/twojapaczka/
+
+  Kreator przesuniesz sam - dane bazy z punktu 3.
+
+  UWAGA: to serwer deweloperski. Nie respektuje plikow .htaccess, wiec
+  katalogi sql/ i config/ sa w nim dostepne jako pliki. NIGDY nie wystawiaj
+  tak uruchomionego panelu publicznie - to nie jest sposob na produkcje.
+
+
+--------------------------------------------------------------------------------
+  16. USUWANIE
+--------------------------------------------------------------------------------
+
+      sudo systemctl stop apache2          # albo nginx
+      sudo rm -rf /var/www/html/twojapaczka
+      sudo mysql -e "DROP DATABASE magazyn;"
+      sudo mysql -e "DROP USER 'magazyn_app'@'localhost';"
+
+================================================================================

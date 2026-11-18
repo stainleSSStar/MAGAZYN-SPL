@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------
+#  Panel Magazynu - pliki lokalne, ktore NIE MOGA trafic do repo
+# ---------------------------------------------------------------
+
+# Dane bazy zapisane przez kreator (zawiera haslo do bazy)
+config/db.local.php
+
+# Konta uzytkownikow i hashe
+config/users.php
+config/auth.local.php
+
+# Nadpisania lokalne (uzywane przy testach)
+config/config.local.php
+
+# Ustawienia panelu (np. materialy pomijane przy zamowieniu)
+config/panel-data.json
+
+# System
+.DS_Store
+Thumbs.db
+*.swp
+*~
