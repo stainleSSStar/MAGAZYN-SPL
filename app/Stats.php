@@ -36,6 +36,7 @@ final class Stats
         // --- Ostatnie wymiany -------------------------------------------------
         $out['ostatnie'] = Database::all(
             'SELECT w.IDwymiany, w.Data, w.Licznik, w.Info,
+                    w.IDdrukarki,
                     m.Nazwa AS ModelNazwa,
                     d.Lokalizacja, d.Adres_IP,
                     a.Nazwa AS MaterialNazwa,

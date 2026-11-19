@@ -145,6 +145,9 @@ final class Schema
             'label_one'   => 'Wymiana',
             'icon'        => '🔄',
             'description' => 'Historia wymiany materiałów eksploatacyjnych: data, urządzenie, model, materiał, pracownik i licznik.',
+            // Kolejność pól w formularzu - urządzenie przed modelem, bo wybór
+            // urządzenia ustawia model sam i zawęża listę materiałów.
+            'form_order'  => ['Data', 'Licznik', 'IDdrukarki', 'IDmodel', 'IDasortyment', 'IDpracownik', 'Info'],
             'columns' => [
                 'IDwymiany' => [
                     'label' => 'ID wymiany',
@@ -334,6 +337,7 @@ final class Schema
             'description' => $static['description'] ?? 'Tabela wykryta automatycznie w bazie danych.',
             'pk'          => $pk,
             'columns'     => $out,
+            'form_order'  => $static['form_order'] ?? [],
             'exists'      => true,
         ];
     }

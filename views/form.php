@@ -19,6 +19,23 @@ $activeTable  = $table;
 $columns = $meta['columns'];
 $pk      = $meta['pk'];
 
+// Ręczna kolejność pól zdefiniowana dla tabeli (np. „Urządzenie” przed „Model”).
+// Kolumny nie wymienione na liście zostają na końcu, w kolejności z bazy.
+if (!empty($meta['form_order'])) {
+    $ordered = [];
+    foreach ($meta['form_order'] as $cName) {
+        if (isset($columns[$cName])) {
+            $ordered[$cName] = $columns[$cName];
+        }
+    }
+    foreach ($columns as $cName => $col) {
+        if (!isset($ordered[$cName])) {
+            $ordered[$cName] = $col;
+        }
+    }
+    $columns = $ordered;
+}
+
 /** Pobiera bieżącą wartość pola z formularza / rekordu. */
 $val = static function (string $name) use ($values, $columns) {
     if (array_key_exists($name, $values)) {

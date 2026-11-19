@@ -66,8 +66,13 @@ $ostatniaWymiana = $stats['ostatnia_wymiana'] ?? null;
                         <tr>
                             <td class="nowrap"><?= e(fmt_date($w['Data'])) ?></td>
                             <td>
+                                <?php $devId = (string) ($w['IDdrukarki'] ?? ''); ?>
                                 <?php if ($w['Lokalizacja']): ?>
-                                    <a href="<?= e(url('device', ['id' => $w['IDdrukarki'] ?? ''])) ?>"><?= e($w['Lokalizacja']) ?></a>
+                                    <?php if ($devId !== ''): ?>
+                                        <a href="<?= e(url('device', ['id' => $devId])) ?>"><?= e($w['Lokalizacja']) ?></a>
+                                    <?php else: ?>
+                                        <?= e($w['Lokalizacja']) ?>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <span class="muted">nie przypisano</span>
                                 <?php endif; ?>
